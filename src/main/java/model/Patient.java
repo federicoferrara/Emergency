@@ -2,12 +2,9 @@ package model;
 
 import java.time.LocalTime;
 
-public class Patient {
+public class Patient implements Comparable<Patient>{
 	
-	@Override
-	public String toString() {
-		return "Patient [arrivalTime=" + arrivalTime + ", color=" + color + "]";
-	}
+	
 
 	public enum ColorCode {
 		NEW, // in triage
@@ -16,11 +13,13 @@ public class Patient {
 		OUT // a casa (abbandonato o curato)
 	} ;
 	
+	private int num;
 	private LocalTime arrivalTime ;
 	private ColorCode color ;
 	
-	public Patient(LocalTime arrivalTime, ColorCode color) {
+	public Patient(int num, LocalTime arrivalTime, ColorCode color) {
 		super();
+		this.num=num;
 		this.arrivalTime = arrivalTime;
 		this.color = color;
 	}
@@ -40,6 +39,27 @@ public class Patient {
 	public void setColor(ColorCode color) {
 		this.color = color;
 	}
+
+	@Override
+	public String toString() {
+		return "Patient [num=" + num + ", arrivalTime=" + arrivalTime + ", color=" + color + "]";
+	}
+
+	@Override
+	public int compareTo(Patient other) {
+		if(this.color.equals(other.color))
+			return this.arrivalTime.compareTo(other.arrivalTime);
+		else if(this.color.equals(Patient.ColorCode.RED))
+			return -1;
+		else if(other.color.equals(Patient.ColorCode.RED))
+			return +1;
+		else if(this.color.equals(Patient.ColorCode.YELLOW))
+			return -1;
+		else
+			return +1;
+	}
+	
+	
 	
 	
 

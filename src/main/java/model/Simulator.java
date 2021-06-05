@@ -13,6 +13,7 @@ public class Simulator {
 
 	// Coda degli eventi
 	private PriorityQueue<Event> queue;
+	private PriorityQueue<Patient> waitingRoom;
 
 	// Modello del mondo
 	private List<Patient> patients;
@@ -47,6 +48,7 @@ public class Simulator {
 	public void init() {
 		// inizializza coda eventi
 		this.queue = new PriorityQueue<>();
+		this.waitingRoom= new PriorityQueue<>();
 
 		// inizializza modello del mondo
 		this.patients = new ArrayList<>();
@@ -64,9 +66,10 @@ public class Simulator {
 		LocalTime ora = this.startTime;
 		int inseriti = 0;
 //		Patient.ColorCode colore = ColorCode.WHITE ;
+		this.queue.add(new Event(ora,EventType.TICK,null));
 
 		while (ora.isBefore(this.endTime) && inseriti < this.numPatients) {
-			Patient p = new Patient(ora, ColorCode.NEW);
+			Patient p = new Patient(inseriti,ora, ColorCode.NEW);
 
 			Event e = new Event(ora, EventType.ARRIVAL, p);
 
@@ -105,7 +108,7 @@ public class Simulator {
 
 		Patient p = e.getPatient();
 		LocalTime ora = e.getTime();
-		Patient.ColorCode colore = p.getColor();
+		
 
 		switch (e.getType()) {
 		case ARRIVAL:
@@ -114,18 +117,37 @@ public class Simulator {
 
 		case TRIAGE:
 			p.setColor(prossimoColore());
-			if (p.getColor().equals(Patient.ColorCode.WHITE))
+			if (p.getColor().equals(Patient.ColorCode.WHITE)) {
+				this.waitingRoom.add(p);
 				this.queue.add(new Event(ora.plus(TIMEOUT_WHITE), EventType.TIMEOUT, p));
-			else if (p.getColor().equals(Patient.ColorCode.YELLOW))
+			}else if (p.getColor().equals(Patient.ColorCode.YELLOW)) {
+				this.waitingRoom.add(p);
 				this.queue.add(new Event(ora.plus(TIMEOUT_YELLOW), EventType.TIMEOUT, p));
-			else if (p.getColor().equals(Patient.ColorCode.RED))
+			}else if (p.getColor().equals(Patient.ColorCode.RED))
+				this.waitingRoom.add(p);
 				this.queue.add(new Event(ora.plus(TIMEOUT_RED), EventType.TIMEOUT, p));
 			break;
 
 		case FREE_STUDIO:
+			if(this.freeStudios==0)
+				return;
+			// Quale paziente ha diritto di entrare??
+			Patient primo= this.waitingRoom.poll();
+			if(primo!=null) {
+				// ammetti il paziente nello studio
+				if(primo.getClass().equals(ColorCode.WHITE))
+					this.queue.add(new Event(ora.plus(DURATION_WHITE),EventType.TREATED, primo));
+				if(primo.getClass().equals(ColorCode.YELLOW))
+					this.queue.add(new Event(ora.plus(DURATION_YELLOW),EventType.TREATED, primo));
+				if(primo.getClass().equals(ColorCode.RED))
+					this.queue.add(new Event(ora.plus(DURATION_RED),EventType.TREATED, primo));
+				primo.setColor(ColorCode.TREATING);
+				this.freeStudios--;
+			}
 			break;
 
 		case TIMEOUT:
+			Patient.ColorCode colore = p.getColor();
 			switch (colore) {
 			case WHITE:
 				p.setColor(ColorCode.OUT);
@@ -133,7 +155,9 @@ public class Simulator {
 				break;
 				
 			case YELLOW:
+				this.waitingRoom.remove(p);
 				p.setColor(ColorCode.RED);
+				this.waitingRoom.add(p);
 				this.queue.add(new Event(ora.plus(TIMEOUT_RED), EventType.TIMEOUT, p));
 				break;
 				
@@ -143,12 +167,22 @@ public class Simulator {
 				break;
 				
 			default:
-				System.out.println("ERRORE: TIMEOUT CON COLORE "+colore) ;
+				System.out.println("ERRORE: TIMEOUT CON COLORE "+colore) ;	
 			}
 			break;
-
+			
 		case TREATED:
+			this.patientsTreated++;
+			p.setColor(ColorCode.OUT);
+			this.freeStudios++;
+			this.queue.add(new Event(ora,EventType.FREE_STUDIO,null));
 			break;
+			
+		case TICK:
+			if(this.freeStudios>0 && !this.waitingRoom.isEmpty())
+				this.queue.add(new Event(ora,EventType.FREE_STUDIO,null));
+			if(ora.isBefore(this.endTime))
+				this.queue.add(new Event(ora.plus(Duration.ofMinutes(5)),EventType.TICK,null));
 		}
 
 	}
